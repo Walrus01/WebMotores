@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, FlatList, Text, View, Image, TouchableOpacity } from 'react-native';
-import axios from 'axios';  // Importando o axios
+import { StyleSheet, FlatList, Text, View, Image, TouchableOpacity, Dimensions, Alert, Modal, Platform } from 'react-native';
+import axios from 'axios';
+import Icon from 'react-native-vector-icons/Feather';
 
 // Definindo o tipo para o carro
 interface Carro {
@@ -17,15 +18,47 @@ interface Carro {
 
 export default function TabOneScreen() {
   // Estado para armazenar os dados da API
-  const [carros, setCarros] = useState<Carro[]>([]); // Tipando o estado como uma lista de carros
+  const [carros, setCarros] = useState<Carro[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [carroIdToRemove, setCarroIdToRemove] = useState<string | null>(null);
 
   // Função para buscar os dados da API
   const fetchCarros = async () => {
     try {
       const response = await axios.get('https://webimotores.onrender.com/carros');
-      setCarros(response.data); // Atualiza o estado com os dados da API
+      setCarros(response.data);
     } catch (error) {
       console.error('Erro ao buscar dados:', error);
+    }
+  };
+
+  // Função para remover um carro
+  const removeCarro = async (id: string) => {
+    if (Platform.OS === 'web') {
+      setShowModal(true);
+      setCarroIdToRemove(id);
+    } else {
+      Alert.alert(
+        'Remover Carro',
+        'Tem certeza de que deseja remover este carro?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Confirmar', onPress: async () => {
+              await axios.delete(`https://webimotores.onrender.com/carros/${id}`);
+              setCarros(prevCarros => prevCarros.filter(carro => carro._id !== id));
+            }
+          }
+        ]
+      );
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (carroIdToRemove) {
+      await axios.delete(`https://webimotores.onrender.com/carros/${carroIdToRemove}`);
+      setCarros(prevCarros => prevCarros.filter(carro => carro._id !== carroIdToRemove));
+      setShowModal(false);
     }
   };
 
@@ -33,6 +66,10 @@ export default function TabOneScreen() {
   useEffect(() => {
     fetchCarros();
   }, []);
+
+  // Detecta a largura da tela para ajustar o número de colunas
+  const { width } = Dimensions.get('window');
+  const numColumns = width > 1024 ? 3 : width > 600 ? 2 : 1;
 
   // Função para renderizar cada item
   const renderItem = ({ item }: { item: Carro }) => (
@@ -43,7 +80,11 @@ export default function TabOneScreen() {
       <Text style={styles.cardPrice}>R$ {item.preco.toLocaleString('pt-BR')}</Text>
       <Text style={styles.cardLocation}>Quilometragem: {item.quilometragem} km</Text>
       <TouchableOpacity style={styles.button}>
-        <Text style={styles.buttonText}>Ver parcelas</Text>
+        <Text style={styles.buttonText}>Comprar</Text>
+      </TouchableOpacity>
+      {/* Ícone de lixeira para remover o carro */}
+      <TouchableOpacity onPress={() => removeCarro(item._id)} style={styles.trashButton}>
+        <Icon name="trash" size={24} color="#fff" />
       </TouchableOpacity>
     </View>
   );
@@ -52,18 +93,8 @@ export default function TabOneScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerText}>Carros novos em São Paulo</Text>
+        <Text style={styles.headerText}>WebMotores</Text>
         <Text style={styles.subHeaderText}>{carros.length} carros encontrados</Text>
-      </View>
-
-      {/* Filters */}
-      <View style={styles.filters}>
-        <TouchableOpacity style={styles.filterButton}>
-          <Text style={styles.filterText}>SÃO PAULO</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.filterButton}>
-          <Text style={styles.filterText}>NOVOS</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Product List */}
@@ -71,9 +102,31 @@ export default function TabOneScreen() {
         data={carros}
         renderItem={renderItem}
         keyExtractor={(item) => item._id}
-        numColumns={2}
+        numColumns={numColumns}
         contentContainerStyle={styles.list}
       />
+
+      {/* Modal para confirmação de remoção na web */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showModal}
+        onRequestClose={() => setShowModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalText}>Tem certeza de que deseja remover este carro?</Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity onPress={() => setShowModal(false)} style={styles.modalButton}>
+                <Text style={styles.modalButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleConfirm} style={styles.modalButton}>
+                <Text style={styles.modalButtonText}>Confirmar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -81,7 +134,7 @@ export default function TabOneScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212', // Fundo escuro para um visual moderno
+    backgroundColor: '#121212',
     paddingHorizontal: 15,
   },
   header: {
@@ -91,42 +144,28 @@ const styles = StyleSheet.create({
   headerText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff', // Cor branca para contraste
+    color: '#fff',
   },
   subHeaderText: {
     fontSize: 14,
     color: '#bbb',
   },
-  filters: {
-    flexDirection: 'row',
-    marginBottom: 15,
-    justifyContent: 'space-between', // Alinha os botões de filtro de forma mais limpa
-  },
-  filterButton: {
-    backgroundColor: '#e60000', // Cor vermelha vibrante
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 25,
-  },
-  filterText: {
-    color: '#fff',
-    fontSize: 14,
-  },
   list: {
     paddingBottom: 20,
   },
   card: {
-    backgroundColor: '#1f1f1f', // Cor de fundo mais escura para cada card
+    backgroundColor: '#1f1f1f',
     borderRadius: 15,
     padding: 15,
     margin: 10,
     flex: 1,
-    elevation: 5, // Adicionando sombra para um efeito de profundidade
+    elevation: 5,
   },
   image: {
     height: 150,
     borderRadius: 10,
     marginBottom: 12,
+    width: '100%',
   },
   cardTitle: {
     fontSize: 18,
@@ -142,7 +181,7 @@ const styles = StyleSheet.create({
   cardPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#e60000', // Usando o vermelho para destacar o preço
+    color: '#e60000',
     marginVertical: 5,
   },
   cardLocation: {
@@ -151,7 +190,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   button: {
-    backgroundColor: '#e60000', // Cor do botão em vermelho
+    backgroundColor: '#e60000',
     borderRadius: 25,
     paddingVertical: 10,
     marginTop: 12,
@@ -160,5 +199,44 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
     fontWeight: 'bold',
+  },
+  trashButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: '#e60000',
+    borderRadius: 50,
+    padding: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 10,
+    width: '80%',
+  },
+  modalText: {
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalButton: {
+    backgroundColor: '#e60000',
+    padding: 10,
+    borderRadius: 5,
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  modalButtonText: {
+    color: '#fff',
+    textAlign: 'center',
   },
 });

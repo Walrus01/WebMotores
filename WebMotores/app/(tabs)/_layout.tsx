@@ -1,9 +1,7 @@
 import React from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 
 function TabBarIcon(props: {
   name: React.ComponentProps<typeof MaterialIcons>['name'];
@@ -18,7 +16,12 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: '#e60000',  // Cor vermelha para os ícones ativos
+        tabBarInactiveTintColor: '#ccc',   // Cor cinza claro para os ícones inativos
+        tabBarStyle: {
+          backgroundColor: '#121212',  // Fundo escuro da barra de navegação
+          borderTopColor: '#333',      // Cor de borda superior (mais suave)
+        },
         headerShown: false,
       }}
     >
